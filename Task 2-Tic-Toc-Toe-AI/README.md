@@ -30,9 +30,9 @@ How to Run Locally
 
 You do not need any special server to run this game.
 
-Save the File: Save the content of tictactoe.html to a file on your local machine.
+Save the File: Save the content of index.html to a file on your local machine.
 
-Open in Browser: Locate the saved file (tictactoe.html) and double-click it.
+Open in Browser: Locate the saved file (index.html) and double-click it.
 
 Play: The game will open directly in your default web browser, and you can start playing immediately.
 
@@ -45,5 +45,6 @@ Maximizing Player (AI / 'O'): The AI always tries to achieve the maximum possibl
 Minimizing Player (Human / 'X'): The AI assumes the human player will always try to minimize the AI's score (leading to a loss: -10).
 
 Depth: The algorithm calculates the score based on how quickly a win or loss is achieved (a faster win gets a higher score).
+
 
 By exploring all future moves, the AI chooses the path that guarantees the best outcome for itself, regardless of the opponent's moves.

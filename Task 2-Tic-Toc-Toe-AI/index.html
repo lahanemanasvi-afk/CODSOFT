@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe AI (Minimax)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the board cells */
+        .board-cell {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem; /* 48px */
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            background-color: #1f2937; /* Dark gray */
+            border: 2px solid #4b5563; /* Lighter border */
+            color: #f3f4f6; /* Light text color */
+        }
+        .board-cell:hover:not(.x, .o) {
+            background-color: #374151; /* Slightly lighter on hover */
+        }
+
+        /* Styling for X and O to look distinct */
+        .x {
+            color: #ef4444; /* Red for X */
+        }
+        .o {
+            color: #3b82f6; /* Blue for O */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen p-4 font-sans">
+
+    <div id="app" class="w-full max-w-lg bg-gray-800 rounded-xl shadow-2xl p-6 md:p-10">
+        <!-- Title and Status Display -->
+        <h1 class="text-4xl font-extrabold text-white text-center mb-6">Unbeatable Tic-Tac-Toe AI</h1>
+        <div id="status" class="text-xl font-semibold text-center mb-6 text-yellow-400 min-h-[3rem] flex items-center justify-center rounded-lg bg-gray-700 p-2">
+            You are X. Click a square to start!
+        </div>
+
+        <!-- Tic-Tac-Toe Board Grid -->
+        <div id="board" class="grid grid-cols-3 gap-2 aspect-square max-w-sm mx-auto p-2 border-4 border-gray-700 rounded-lg">
+            <!-- Cells will be created by JavaScript -->
+        </div>
+
+        <!-- Game Controls -->
+        <div class="mt-8 flex justify-center">
+            <button id="reset-button" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-150 transform hover:scale-105">
+                Reset Game
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME STATE AND INITIALIZATION ---
+        
+        // The game board state: 0-8 indices. ' ' = empty, 'X' = Human, 'O' = AI
+        let board = Array(9).fill(' ');
+        let humanPlayer = 'X';
+        let aiPlayer = 'O';
+        let isGameOver = false;
+
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+
+        // Winning combinations (indices of the board array)
+        const WIN_COMBOS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        // --- CORE GAME LOGIC ---
+
+        // Function to create and render the board cells
+        function createBoard() {
+            boardElement.innerHTML = ''; // Clear previous board
+            board.forEach((cell, index) => {
+                const cellDiv = document.createElement('div');
+                cellDiv.classList.add('board-cell');
+                cellDiv.dataset.index = index;
+                cellDiv.textContent = cell === ' ' ? '' : cell;
+                
+                if (cell !== ' ') {
+                    cellDiv.classList.add(cell.toLowerCase());
+                    cellDiv.classList.remove('cursor-pointer');
+                } else {
+                    cellDiv.classList.add('cursor-pointer'); // Make empty cell clickable
+                    cellDiv.onclick = () => handleHumanMove(index);
+                }
+                boardElement.appendChild(cellDiv);
+            });
+            updateStatus(statusElement.textContent);
+        }
+
+        // Function to check if a player has won
+        function checkWin(currentBoard, player) {
+            return WIN_COMBOS.some(combination => {
+                return combination.every(index => {
+                    return currentBoard[index] === player;
+                });
+            });
+        }
+
+        // Function to check for a draw
+        function checkDraw(currentBoard) {
+            return currentBoard.every(cell => cell !== ' ');
+        }
+
+        // Update the visual representation of the game state
+        function updateBoardDisplay() {
+            board.forEach((cell, index) => {
+                const cellDiv = boardElement.querySelector(`[data-index="${index}"]`);
+                if (cellDiv) {
+                    cellDiv.textContent = cell === ' ' ? '' : cell;
+                    
+                    // Clear previous state classes and click handler
+                    cellDiv.classList.remove('x', 'o', 'cursor-pointer');
+                    cellDiv.onclick = null;
+
+                    if (cell !== ' ') {
+                        // Cell is 'X' or 'O'
+                        cellDiv.classList.add(cell.toLowerCase());
+                    } else {
+                        // Cell is empty, so make it clickable
+                        cellDiv.classList.add('cursor-pointer');
+                        cellDiv.onclick = () => handleHumanMove(index);
+                    }
+                }
+            });
+        }
+
+        // Update the status message
+        function updateStatus(message, color = 'text-yellow-400') {
+            statusElement.textContent = message;
+            statusElement.className = `text-xl font-semibold text-center mb-6 ${color} min-h-[3rem] flex items-center justify-center rounded-lg bg-gray-700 p-2`;
+        }
+
+        // Handle the end of the game
+        function endGame(winner) {
+            isGameOver = true;
+            boardElement.querySelectorAll('.board-cell').forEach(cell => cell.onclick = null); // Disable further moves
+            
+            if (winner === humanPlayer) {
+                updateStatus('You Won! (Impossible against Minimax, great job!)', 'text-green-400');
+            } else if (winner === aiPlayer) {
+                updateStatus('AI Wins! (Unbeatable)', 'text-red-400');
+            } else {
+                updateStatus('It\'s a Draw!', 'text-blue-400');
+            }
+        }
+
+        // --- HUMAN PLAYER MOVE ---
+        
+        function handleHumanMove(index) {
+            if (isGameOver || board[index] !== ' ') return;
+
+            // 1. Human makes a move
+            board[index] = humanPlayer;
+            updateBoardDisplay();
+            updateStatus('AI is thinking...');
+
+            // 2. Check for win/draw immediately after human move
+            if (checkWin(board, humanPlayer)) {
+                endGame(humanPlayer);
+                return;
+            }
+            if (checkDraw(board)) {
+                endGame('Draw');
+                return;
+            }
+
+            // 3. AI's Turn (introduce a slight delay for better user experience)
+            setTimeout(() => {
+                handleAIMove();
+            }, 500); // AI moves after 0.5 second delay
+        }
+
+        // --- MINIMAX AI IMPLEMENTATION ---
+
+        // Returns an array of available spots (indices) on the board
+        function getAvailableMoves(currentBoard) {
+            return currentBoard
+                .map((cell, index) => cell === ' ' ? index : null)
+                .filter(index => index !== null);
+        }
+        
+        // The Minimax function (Recursive)
+        // Returns the score of the board state
+        function minimax(currentBoard, depth, isMaximizing) {
+            // Base Case 1: AI Wins (Score +10 - depth)
+            if (checkWin(currentBoard, aiPlayer)) {
+                return 10 - depth;
+            }
+            // Base Case 2: Human Wins (Score -10 + depth)
+            if (checkWin(currentBoard, humanPlayer)) {
+                return depth - 10;
+            }
+            // Base Case 3: Draw (Score 0)
+            if (checkDraw(currentBoard)) {
+                return 0;
+            }
+
+            const availableMoves = getAvailableMoves(currentBoard);
+
+            if (isMaximizing) {
+                // AI's turn (Maximizer)
+                let bestScore = -Infinity;
+                for (const move of availableMoves) {
+                    currentBoard[move] = aiPlayer;
+                    let score = minimax(currentBoard, depth + 1, false); // Recurse: next turn is human's
+                    currentBoard[move] = ' '; // Undo move
+                    bestScore = Math.max(bestScore, score);
+                }
+                return bestScore;
+            } else {
+                // Human's turn (Minimizer)
+                let bestScore = Infinity;
+                for (const move of availableMoves) {
+                    currentBoard[move] = humanPlayer;
+                    let score = minimax(currentBoard, depth + 1, true); // Recurse: next turn is AI's
+                    currentBoard[move] = ' '; // Undo move
+                    bestScore = Math.min(bestScore, score);
+                }
+                return bestScore;
+            }
+        }
+
+        // Function to find the optimal move for the AI
+        function findBestMove() {
+            let bestScore = -Infinity;
+            let bestMove = -1;
+            const availableMoves = getAvailableMoves(board);
+
+            // Iterate through all possible moves and find the one with the highest minimax score
+            for (const move of availableMoves) {
+                // 1. Make the move
+                board[move] = aiPlayer;
+                
+                // 2. Calculate the score using minimax (assuming the opponent minimizes)
+                let score = minimax(board, 0, false); 
+                
+                // 3. Undo the move
+                board[move] = ' ';
+
+                // 4. Update the best score/move
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
+                }
+            }
+            return bestMove;
+        }
+
+        // --- AI PLAYER MOVE HANDLER ---
+        
+        function handleAIMove() {
+            if (isGameOver) return;
+
+            const move = findBestMove();
+
+            if (move !== -1) {
+                board[move] = aiPlayer;
+            }
+            
+            updateBoardDisplay();
+
+            // Check for win/draw after AI move
+            if (checkWin(board, aiPlayer)) {
+                endGame(aiPlayer);
+                return;
+            }
+            if (checkDraw(board)) {
+                endGame('Draw');
+                return;
+            }
+
+            // Game continues
+            updateStatus('Your turn (X).');
+        }
+
+        // --- RESET FUNCTIONALITY ---
+
+        function resetGame() {
+            board = Array(9).fill(' ');
+            isGameOver = false;
+            createBoard(); // Re-render the board and reattach event listeners
+            updateStatus('You are X. Click a square to start!');
+        }
+
+        resetButton.addEventListener('click', resetGame);
+
+        // Initial setup when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            createBoard();
+        });
+    </script>
+</body>
+</html>
